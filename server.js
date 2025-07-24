@@ -1,47 +1,26 @@
 const express = require('express');
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const busboy = require('busboy');
 
 const app = express();
-const PORT = 9999;
+const PORT = 3000;
 
-// Always resolve relative to the location of the running executable or script
-const baseDir = path.dirname(process.execPath || __dirname);
- 
+const isPkg = typeof process.pkg !== 'undefined';
+const baseDir = isPkg ? path.dirname(process.execPath) : __dirname;
 const uploadDir = path.join(baseDir, 'uploads');
+
+// Ensure uploads folder exists
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
-// Ensure unique file name by appending numbers
-function getUniqueFilename(folder, originalName) {
-  const ext = path.extname(originalName);
-  const base = path.basename(originalName, ext);
-  let filename = originalName;
-  let counter = 1;
-
-  while (fs.existsSync(path.join(folder, filename))) {
-    filename = `${base}(${counter})${ext}`;
-    counter++;
-  }
-
-  return filename;
-}
-
-// Multer setup
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, getUniqueFilename(uploadDir, file.originalname)),
-});
-const upload = multer({ storage });
-
-// Serve embedded HTML file
+// Serve embedded HTML
 app.get('/', (req, res) => {
-  const htmlPath = path.join(__dirname, 'index.html'); // pkg will bundle this
+  const htmlPath = path.join(__dirname, 'index.html');
   fs.readFile(htmlPath, 'utf8', (err, data) => {
     if (err) {
-      res.status(500).send('Could not load UI');
+      res.status(500).send('Error loading UI');
     } else {
       res.send(data);
     }
@@ -49,11 +28,57 @@ app.get('/', (req, res) => {
 });
 
 app.use('/uploads', express.static(uploadDir));
-app.use(express.static(baseDir));
-app.post('/upload', upload.array('files'), (req, res) => {
-  res.send('✅ Files uploaded!');
+
+// File upload handler with console progress
+app.post('/upload', (req, res) => {
+  const bb = busboy({ headers: req.headers });
+  let uploadedFiles = [];
+
+  bb.on('file', (name, file, info) => {
+    const { filename } = info;
+    const saveName = getUniqueFilename(uploadDir, filename);
+    const savePath = path.join(uploadDir, saveName);
+    const writeStream = fs.createWriteStream(savePath);
+
+    let totalBytes = 0;
+
+    console.log(`⬇️ Uploading: ${filename}`);
+
+    file.on('data', (chunk) => {
+      totalBytes += chunk.length;
+      process.stdout.write(`📦 ${filename}: ${Math.round(totalBytes / 1024)} KB uploaded\r`);
+    });
+
+    file.pipe(writeStream);
+
+    file.on('end', () => {
+      console.log(`\n✅ Uploaded: ${filename} as ${saveName}`);
+      uploadedFiles.push(saveName);
+    });
+  });
+
+  bb.on('finish', () => {
+    res.status(200).send('Files uploaded successfully!');
+  });
+
+  req.pipe(bb);
 });
 
+// Util: unique file names with number suffix
+function getUniqueFilename(folder, originalName) {
+  const ext = path.extname(originalName);
+  const base = path.basename(originalName, ext);
+  let filename = originalName;
+  let count = 1;
+
+  while (fs.existsSync(path.join(folder, filename))) {
+    filename = `${base}(${count})${ext}`;
+    count++;
+  }
+
+  return filename;
+}
+
 app.listen(PORT, () => {
-  console.log(`🚀 Server ready at http://localhost:${PORT}`);
+  console.log(`🚀 Upload server running at http://localhost:${PORT}`);
 });
