@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Multi File Upload – One Request with Per-File Bars</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 40px;
+    }
+
+    .file-block {
+      margin-bottom: 15px;
+    }
+
+    .progress-container {
+      width: 100%;
+      background-color: #f3f3f3;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 20px;
+      width: 0%;
+      background-color: #4caf50;
+      text-align: center;
+      line-height: 20px;
+      color: white;
+    }
+
+    .status {
+      margin-top: 5px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <h2>Upload Multiple Files (Single Request)</h2>
+  <form id="uploadForm">
+    <input type="file" id="fileInput" name="files" multiple required />
+    <button type="submit">Upload</button>
+  </form>
+
+  <div id="progressContainer"></div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('fileInput');
+    const progressContainer = document.getElementById('progressContainer');
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const files = fileInput.files;
+      if (!files.length) return;
+
+      // Reset UI
+      progressContainer.innerHTML = '';
+
+      const fileData = [];
+      let totalSize = 0;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        totalSize += file.size;
+
+        const block = document.createElement('div');
+        block.className = 'file-block';
+
+        const label = document.createElement('div');
+        label.textContent = `Uploading: ${file.name}`;
+
+        const container = document.createElement('div');
+        container.className = 'progress-container';
+
+        const bar = document.createElement('div');
+        bar.className = 'progress-bar';
+
+        const status = document.createElement('div');
+        status.className = 'status';
+
+        container.appendChild(bar);
+        block.appendChild(label);
+        block.appendChild(container);
+        block.appendChild(status);
+        progressContainer.appendChild(block);
+
+        fileData.push({ file, bar, status, loaded: 0 });
+      }
+
+      // Create FormData
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+
+      // Upload in one request
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percent = e.loaded / e.total;
+
+          let loadedSoFar = 0;
+          for (const fd of fileData) {
+            const proportion = fd.file.size / totalSize;
+            const simulatedLoaded = e.total * proportion * percent;
+            const simulatedPercent = Math.min(100, Math.round((simulatedLoaded / fd.file.size) * 100));
+
+            fd.bar.style.width = simulatedPercent + '%';
+            fd.bar.textContent = simulatedPercent + '%';
+
+            loadedSoFar += simulatedLoaded;
+          }
+        }
+      });
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          fileData.forEach(fd => fd.status.textContent = '✅ Uploaded successfully');
+        } else {
+          fileData.forEach(fd => fd.status.textContent = '❌ Upload failed');
+        }
+      };
+
+      xhr.onerror = () => {
+        fileData.forEach(fd => fd.status.textContent = '❌ Upload error');
+      };
+
+      xhr.open('POST', '/upload');
+      xhr.send(formData);
+    });
+  </script>
+</body>
+</html>
