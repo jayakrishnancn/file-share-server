@@ -1,0 +1,1 @@
+pkg . --targets node18-win-x64 --output upload-server.exe
