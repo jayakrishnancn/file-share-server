@@ -5,13 +5,16 @@ const fs = require('fs');
 
 const app = express();
 const PORT = 9999;
-const uploadDir = 'uploads';
 
+// Always resolve relative to the location of the running executable or script
+const baseDir = path.dirname(process.execPath || __dirname);
+ 
+const uploadDir = path.join(baseDir, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
-// Generate unique filename if duplicate
+// Ensure unique file name by appending numbers
 function getUniqueFilename(folder, originalName) {
   const ext = path.extname(originalName);
   const base = path.basename(originalName, ext);
@@ -26,28 +29,31 @@ function getUniqueFilename(folder, originalName) {
   return filename;
 }
 
+// Multer setup
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const safeName = getUniqueFilename(uploadDir, file.originalname);
-    cb(null, safeName);
-  }
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, getUniqueFilename(uploadDir, file.originalname)),
 });
-
 const upload = multer({ storage });
 
+// Serve embedded HTML file
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  const htmlPath = path.join(__dirname, 'index.html'); // pkg will bundle this
+  fs.readFile(htmlPath, 'utf8', (err, data) => {
+    if (err) {
+      res.status(500).send('Could not load UI');
+    } else {
+      res.send(data);
+    }
+  });
 });
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
+app.use('/uploads', express.static(uploadDir));
+app.use(express.static(baseDir));
 app.post('/upload', upload.array('files'), (req, res) => {
-  res.send('✅ Files uploaded successfully!');
+  res.send('✅ Files uploaded!');
 });
 
 app.listen(PORT, () => {
-  console.log(`File upload server running at http://localhost:${PORT}`);
+  console.log(`🚀 Server ready at http://localhost:${PORT}`);
 });
