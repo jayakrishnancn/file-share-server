@@ -4,7 +4,7 @@ const fs = require('fs');
 const busboy = require('busboy');
 
 const app = express();
-const PORT = 3000;
+const PORT = 6748;
 
 const isPkg = typeof process.pkg !== 'undefined';
 const baseDir = isPkg ? path.dirname(process.execPath) : __dirname;
