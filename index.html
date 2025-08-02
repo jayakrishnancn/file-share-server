@@ -16,17 +16,7 @@
       width: 100vw;
       overflow: hidden;
     }
-
-    .container {
-      display: grid;
-      grid-template-columns: 1fr 0;
-      min-height: 100vh;
-      transition: grid-template-columns 0.3s ease;
-    }
-
-    .container.show-history {
-      grid-template-columns: 1fr 300px;
-    }
+ 
 
     .upload-section {
       padding: 40px;
@@ -42,7 +32,7 @@
     .history-toggle {
       position: fixed;
       right: 25px;
-      top: 15px;
+      top: 10px;
       width: 40px;
       height: 36px;
       background: #444;
@@ -55,40 +45,32 @@
       z-index: 10;
       transition: transform 0.3s ease;
       border-radius: 4px;
-      padding: 3px;
+      padding: 0;
     }
-
-    @media (max-width: 768px) {
+ 
       .container {
         display: block;
         position: relative;
         overflow: hidden;
       }
-
-      .container.show-history .upload-section {
-        display: none;
-      }
-
-      .container.show-history {
-        grid-template-columns: 1fr;
-      }
+ 
 
       .history-section {
         position: fixed;
         top: 0;
-        left: 0;
+        right: 0;
         width: 100%;
         height: 100%;
         transform: translateX(100%);
         transition: transform 0.3s ease;
+         max-width: 400px;
+      box-shadow:  -4px -4px 7px 0px #e0e0e0;
       }
 
       .container.show-history .history-section {
         transform: translateX(0);
       }
 
-
-    }
 
     .container.show-history .history-toggle svg {
       transform: rotate(180deg);
