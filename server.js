@@ -59,10 +59,94 @@ app.get('/uploads', (req, res) => {
   });
 });
 
+// Get file extension from MIME type
+function getExtensionFromMime(mimeType) {
+  const mimeMap = {
+    // Images
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/heic': '.heic',
+    'image/heif': '.heif',
+    'image/svg+xml': '.svg',
+    'image/bmp': '.bmp',
+    'image/tiff': '.tiff',
+    'image/x-icon': '.ico',
+    // Videos
+    'video/mp4': '.mp4',
+    'video/quicktime': '.mov',
+    'video/x-msvideo': '.avi',
+    'video/x-matroska': '.mkv',
+    'video/webm': '.webm',
+    'video/x-ms-wmv': '.wmv',
+    'video/mpeg': '.mpeg',
+    // Audio
+    'audio/mpeg': '.mp3',
+    'audio/wav': '.wav',
+    'audio/webm': '.weba',
+    'audio/ogg': '.ogg',
+    'audio/aac': '.aac',
+    'audio/midi': '.midi',
+    'audio/x-m4a': '.m4a',
+    // Documents
+    'application/pdf': '.pdf',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+    'application/vnd.ms-powerpoint': '.ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+    // Archives
+    'application/zip': '.zip',
+    'application/x-rar-compressed': '.rar',
+    'application/x-7z-compressed': '.7z',
+    'application/x-tar': '.tar',
+    'application/gzip': '.gz',
+    // Text
+    'text/plain': '.txt',
+    'text/html': '.html',
+    'text/css': '.css',
+    'text/javascript': '.js',
+    'text/csv': '.csv',
+    'text/xml': '.xml',
+    'text/markdown': '.md',
+    // Programming
+    'application/json': '.json',
+    'application/javascript': '.js',
+    'application/typescript': '.ts',
+    'application/x-httpd-php': '.php',
+    'application/x-python-code': '.py',
+    'text/x-java-source': '.java',
+    'text/x-c': '.c',
+    'text/x-c++': '.cpp',
+    // Fonts
+    'font/ttf': '.ttf',
+    'font/otf': '.otf',
+    'font/woff': '.woff',
+    'font/woff2': '.woff2',
+    // Others
+    'application/octet-stream': '.bin',
+    'application/x-executable': '.exe',
+    'application/vnd.android.package-archive': '.apk'
+  };
+  return mimeMap[mimeType] || '';
+}
+
 // Sanitize filename to prevent directory traversal and invalid chars
-function sanitizeFilename(filename) {
+function sanitizeFilename(filename, mimeType) {
   // Remove path traversal and normalize
-  const sanitized = path.basename(filename).replace(/[^a-zA-Z0-9.-]/g, '_');
+  let sanitized = path.basename(filename).replace(/[^a-zA-Z0-9.-]/g, '_');
+  
+  // If no extension and we have a MIME type, add the appropriate extension
+  if (!path.extname(sanitized) && mimeType) {
+    const ext = getExtensionFromMime(mimeType);
+    if (ext) {
+      sanitized += ext;
+    }
+  }
+  
   return sanitized || 'unnamed_file';
 }
 
@@ -117,8 +201,8 @@ app.post('/upload', (req, res) => {
       return formatResponse(res, 400, { error: 'Malformed multipart/form-data request' });
     }
     bb.on('file', (name, file, info) => {
-      const { filename } = info;
-      const saveName = getUniqueFilename(uploadDir, filename);
+      const { filename, mimeType } = info;
+      const saveName = getUniqueFilename(uploadDir, sanitizeFilename(filename, mimeType));
       const savePath = path.join(uploadDir, saveName);
       const writeStream = fs.createWriteStream(savePath);
       let totalBytes = 0;
@@ -161,7 +245,10 @@ app.post('/upload', (req, res) => {
     req.pipe(bb);
   } else {
     // Handle non-multipart uploads (single file, any type)
-    let filename = sanitizeFilename(req.headers['x-filename'] || `upload_${Date.now()}`);
+    let filename = sanitizeFilename(
+      req.headers['x-filename'] || `upload_${Date.now()}`,
+      req.headers['content-type']
+    );
     const saveName = getUniqueFilename(uploadDir, filename);
     const savePath = path.join(uploadDir, saveName);
     const writeStream = fs.createWriteStream(savePath);
