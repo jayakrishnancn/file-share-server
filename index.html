@@ -11,12 +11,20 @@
       margin: 0;
       padding: 0;
       min-height: 100vh;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
     }
 
     .container {
       display: grid;
-      grid-template-columns: 1fr 300px;
+      grid-template-columns: 1fr 0;
       min-height: 100vh;
+      transition: grid-template-columns 0.3s ease;
+    }
+
+    .container.show-history {
+      grid-template-columns: 1fr 300px;
     }
 
     .upload-section {
@@ -25,11 +33,58 @@
       flex-direction: column;
       align-items: center;
       border-right: 1px solid #ddd;
+      position: relative;
+    }
+
+    .history-toggle {
+      position: absolute;
+      right: -2px;
+      top: 20px;
+      width: 40px;
+      height: 40px;
+      background: #444;
+      color: white;
+      border: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 10;
+      transition: transform 0.3s ease; 
+      border-radius: 40px 0 0 40px;
+      padding: 6px;
+      padding-left: 10px;
+    }
+ 
+    .container.show-history .history-toggle svg {
+      transform: rotate(180deg);
     }
 
     .history-section {
       padding: 20px;
       background: white;
+      overflow: hidden;
+    }
+
+    .drop-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 123, 255, 0.1);
+      border: 2px dashed #007bff;
+      display: none;
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .drop-overlay.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #007bff;
     }
 
     .history-section h2 {
@@ -57,10 +112,11 @@
     }
 
     .history-item img {
-      width: 32px;
-      height: 32px;
+      width: 42px;
+      height: 42px;
       object-fit: cover;
       border-radius: 4px;
+      border: 2px solid #111;
     }
 
     .history-item-info {
@@ -178,24 +234,25 @@
     .file-ext-preview {
       width: 100px;
       height: 100px;
-      margin-top: 5px;
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
+      margin-top: 5px; 
+      background: #d73a1a;
+      border: 2px solid #111;
       border-radius: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 24px;
       font-weight: bold;
-      color: #6c757d;
+      color: #fff;
       text-transform: uppercase;
+      margin-bottom: 5px;
     }
 
     .history-ext-preview {
-      width: 32px;
-      height: 32px;
+      width: 42px;
+      height: 42px;
       background: #d73a1a;
-      border: 1px solid #e9ecef;
+      border: 2px solid #111;
       border-radius: 4px;
       display: flex;
       align-items: center;
@@ -224,8 +281,17 @@
 </head>
 <body>
 
+  <div class="drop-overlay" id="dropOverlay">
+    Drop files anywhere to upload
+  </div>
+
   <div class="container">
     <div class="upload-section">
+      <div class="history-toggle" id="historyToggle" title="Toggle history panel">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M9 2l1 1L6.5 7.5 10 11l-1 1L4.5 7.5 9 2z"/>
+        </svg>
+      </div>
       <h2>Drag & Drop File Upload</h2>
 
       <form id="uploadForm">
@@ -249,7 +315,22 @@
     const fileInput = document.getElementById('fileInput');
     const fileList = document.getElementById('fileList');
     const form = document.getElementById('uploadForm');
+    const dropOverlay = document.getElementById('dropOverlay');
+    const historyToggle = document.getElementById('historyToggle');
+    const container = document.querySelector('.container');
     let filesToUpload = [];
+
+    // Toggle history panel
+    historyToggle.addEventListener('click', () => {
+      container.classList.toggle('show-history');
+      // Save preference
+      localStorage.setItem('showHistory', container.classList.contains('show-history'));
+    });
+
+    // Restore history panel state
+    if (localStorage.getItem('showHistory') === 'true') {
+      container.classList.add('show-history');
+    }
 
     dropZone.addEventListener('click', () => fileInput.click());
 
@@ -257,18 +338,21 @@
       handleFiles(e.target.files);
     });
 
-    dropZone.addEventListener('dragover', (e) => {
+    // Global drag and drop
+    document.addEventListener('dragover', (e) => {
       e.preventDefault();
-      dropZone.classList.add('dragover');
+      dropOverlay.classList.add('active');
     });
 
-    dropZone.addEventListener('dragleave', () => {
-      dropZone.classList.remove('dragover');
+    document.addEventListener('dragleave', (e) => {
+      if (!e.relatedTarget) {
+        dropOverlay.classList.remove('active');
+      }
     });
 
-    dropZone.addEventListener('drop', (e) => {
+    document.addEventListener('drop', (e) => {
       e.preventDefault();
-      dropZone.classList.remove('dragover');
+      dropOverlay.classList.remove('active');
       handleFiles(e.dataTransfer.files);
     });
 
