@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>File Upload</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
+      font-family: monospace;
       background: #f9f9f9;
       margin: 0;
       padding: 0;
@@ -34,14 +35,16 @@
       align-items: center;
       border-right: 1px solid #ddd;
       position: relative;
+      min-height: 100vh;
+      box-sizing: border-box;
     }
 
     .history-toggle {
-      position: absolute;
-      right: -2px;
-      top: 20px;
+      position: fixed;
+      right: 25px;
+      top: 15px;
       width: 40px;
-      height: 40px;
+      height: 36px;
       background: #444;
       color: white;
       border: 1px solid #ddd;
@@ -50,12 +53,43 @@
       justify-content: center;
       cursor: pointer;
       z-index: 10;
-      transition: transform 0.3s ease; 
-      border-radius: 40px 0 0 40px;
-      padding: 6px;
-      padding-left: 10px;
+      transition: transform 0.3s ease;
+      border-radius: 4px;
+      padding: 3px;
     }
- 
+
+    @media (max-width: 768px) {
+      .container {
+        display: block;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .container.show-history .upload-section {
+        display: none;
+      }
+
+      .container.show-history {
+        grid-template-columns: 1fr;
+      }
+
+      .history-section {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+      }
+
+      .container.show-history .history-section {
+        transform: translateX(0);
+      }
+
+
+    }
+
     .container.show-history .history-toggle svg {
       transform: rotate(180deg);
     }
@@ -63,7 +97,9 @@
     .history-section {
       padding: 20px;
       background: white;
-      overflow: hidden;
+      overflow-y: auto;
+      height: 100vh;
+      box-sizing: border-box;
     }
 
     .drop-overlay {
@@ -182,6 +218,7 @@
       text-align: center;
       cursor: pointer;
       transition: 0.3s ease;
+      box-sizing: border-box;
     }
 
     .drop-zone.dragover {
@@ -200,7 +237,7 @@
       padding: 10px;
       margin-bottom: 10px;
       border-radius: 6px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
     .file-name {
@@ -234,7 +271,7 @@
     .file-ext-preview {
       width: 100px;
       height: 100px;
-      margin-top: 5px; 
+      margin-top: 5px;
       background: #d73a1a;
       border: 2px solid #111;
       border-radius: 4px;
@@ -279,6 +316,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <div class="drop-overlay" id="dropOverlay">
@@ -287,11 +325,7 @@
 
   <div class="container">
     <div class="upload-section">
-      <div class="history-toggle" id="historyToggle" title="Toggle history panel">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M9 2l1 1L6.5 7.5 10 11l-1 1L4.5 7.5 9 2z"/>
-        </svg>
-      </div>
+
       <h2>Drag & Drop File Upload</h2>
 
       <form id="uploadForm">
@@ -300,8 +334,15 @@
           <input type="file" id="fileInput" name="files" multiple style="display: none;" />
         </div>
         <button type="submit">Upload</button>
-        <div class="file-list" id="fileList"></div>   
+        <hr color="#e0e0e0"/> 
+        <div class="file-list" id="fileList"></div>
       </form>
+    </div>
+
+    <div class="history-toggle" id="historyToggle" title="Toggle history panel">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M9 2l1 1L6.5 7.5 10 11l-1 1L4.5 7.5 9 2z" />
+      </svg>
     </div>
 
     <div class="history-section">
@@ -310,7 +351,8 @@
     </div>
   </div>
 
-  <script>
+
+<script>
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const fileList = document.getElementById('fileList');
@@ -463,11 +505,11 @@
     function getFilePreview(filename) {
       const ext = filename.split('.').pop().toLowerCase();
       const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-      
+
       if (imageExts.includes(ext)) {
         return `<img src="/uploads/${filename}" onerror="this.outerHTML='<div class=\\'history-ext-preview\\'>${ext.toUpperCase()}</div>'" alt="">`;
       }
-      
+
       return `<div class="history-ext-preview">${ext.toUpperCase()}</div>`;
     }
 
@@ -476,12 +518,12 @@
       const units = ['B', 'KB', 'MB', 'GB'];
       let size = bytes;
       let unitIndex = 0;
-      
+
       while (size >= 1024 && unitIndex < units.length - 1) {
         size /= 1024;
         unitIndex++;
       }
-      
+
       return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
 
@@ -498,11 +540,11 @@
     // Update history list
     async function updateHistory() {
       const historyList = document.getElementById('historyList');
-      
+
       try {
         const response = await fetch('/uploads');
         const files = await response.json();
-        
+
         historyList.innerHTML = files.map(file => `
           <div class="history-item">
             ${getFilePreview(file.name)}
@@ -556,4 +598,5 @@
     });
   </script>
 </body>
+
 </html>
