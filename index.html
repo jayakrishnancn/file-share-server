@@ -9,10 +9,108 @@
       font-family: 'Segoe UI', sans-serif;
       background: #f9f9f9;
       margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      min-height: 100vh;
+    }
+
+    .upload-section {
       padding: 40px;
       display: flex;
       flex-direction: column;
       align-items: center;
+      border-right: 1px solid #ddd;
+    }
+
+    .history-section {
+      padding: 20px;
+      background: white;
+    }
+
+    .history-section h2 {
+      margin-top: 0;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .history-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .history-item {
+      padding: 10px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .history-item:hover {
+      background: #f8f9fa;
+    }
+
+    .history-item img {
+      width: 32px;
+      height: 32px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+
+    .history-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .history-item-name {
+      font-size: 14px;
+      font-weight: 500;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .history-item-time {
+      font-size: 12px;
+      color: #666;
+      margin: 0;
+    }
+
+    .history-item-actions {
+      display: flex;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .history-item:hover .history-item-actions {
+      opacity: 1;
+    }
+
+    .download-btn {
+      background: none;
+      border: none;
+      padding: 4px;
+      margin: 0;
+      cursor: pointer;
+      color: #007bff;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+    }
+
+    .download-btn:hover {
+      background: #e8f5ff;
     }
 
     h2 {
@@ -77,6 +175,37 @@
       margin-top: 5px;
     }
 
+    .file-ext-preview {
+      width: 100px;
+      height: 100px;
+      margin-top: 5px;
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      color: #6c757d;
+      text-transform: uppercase;
+    }
+
+    .history-ext-preview {
+      width: 32px;
+      height: 32px;
+      background: #d73a1a;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: #fff;
+      text-transform: uppercase;
+    }
+
     button {
       margin-top: 20px;
       padding: 10px 20px;
@@ -95,16 +224,25 @@
 </head>
 <body>
 
-  <h2>Drag & Drop File Upload</h2>
+  <div class="container">
+    <div class="upload-section">
+      <h2>Drag & Drop File Upload</h2>
 
-  <form id="uploadForm">
-    <div class="drop-zone" id="dropZone">
-      Drag and drop files here or click to select
-      <input type="file" id="fileInput" name="files" multiple style="display: none;" />
+      <form id="uploadForm">
+        <div class="drop-zone" id="dropZone">
+          Drag and drop files here or click to select
+          <input type="file" id="fileInput" name="files" multiple style="display: none;" />
+        </div>
+        <button type="submit">Upload</button>
+        <div class="file-list" id="fileList"></div>   
+      </form>
     </div>
-    <button type="submit">Upload</button>
-    <div class="file-list" id="fileList"></div>   
-  </form>
+
+    <div class="history-section">
+      <h2>Upload History</h2>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
 
   <script>
     const dropZone = document.getElementById('dropZone');
@@ -134,6 +272,26 @@
       handleFiles(e.dataTransfer.files);
     });
 
+    function getFileExtension(filename) {
+      return filename.split('.').pop().toUpperCase();
+    }
+
+    function createPreview(file) {
+      if (file.type.startsWith('image/')) {
+        const preview = document.createElement('img');
+        preview.className = 'preview-img';
+        const reader = new FileReader();
+        reader.onload = e => preview.src = e.target.result;
+        reader.readAsDataURL(file);
+        return preview;
+      } else {
+        const preview = document.createElement('div');
+        preview.className = 'file-ext-preview';
+        preview.textContent = getFileExtension(file.name);
+        return preview;
+      }
+    }
+
     function handleFiles(fileListObj) {
       filesToUpload = [...fileListObj];
       fileList.innerHTML = '';
@@ -146,13 +304,7 @@
         name.className = 'file-name';
         name.textContent = file.name;
 
-        const preview = document.createElement('img');
-        preview.className = 'preview-img';
-        if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = e => preview.src = e.target.result;
-          reader.readAsDataURL(file);
-        }
+        const preview = createPreview(file);
 
         const container = document.createElement('div');
         container.className = 'progress-container';
@@ -223,6 +375,78 @@
       });
     }
 
+    // Get file preview element
+    function getFilePreview(filename) {
+      const ext = filename.split('.').pop().toLowerCase();
+      const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+      
+      if (imageExts.includes(ext)) {
+        return `<img src="/uploads/${filename}" onerror="this.outerHTML='<div class=\\'history-ext-preview\\'>${ext.toUpperCase()}</div>'" alt="">`;
+      }
+      
+      return `<div class="history-ext-preview">${ext.toUpperCase()}</div>`;
+    }
+
+    // Format file size
+    function formatFileSize(bytes) {
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let size = bytes;
+      let unitIndex = 0;
+      
+      while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
+      }
+      
+      return `${size.toFixed(1)} ${units[unitIndex]}`;
+    }
+
+    // Download file
+    function downloadFile(filename) {
+      const link = document.createElement('a');
+      link.href = `/uploads/${filename}`;
+      link.download = filename; // This will force download instead of navigation
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Update history list
+    async function updateHistory() {
+      const historyList = document.getElementById('historyList');
+      
+      try {
+        const response = await fetch('/uploads');
+        const files = await response.json();
+        
+        historyList.innerHTML = files.map(file => `
+          <div class="history-item">
+            ${getFilePreview(file.name)}
+            <div class="history-item-info">
+              <p class="history-item-name" title="${file.name}">${file.name}</p>
+              <p class="history-item-time">
+                ${formatFileSize(file.size)} • ${new Date(file.time).toLocaleString()}
+              </p>
+            </div>
+            <div class="history-item-actions">
+              <button class="download-btn" onclick="downloadFile('${file.name}')" title="Download file">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
+                  <path d="M2 13h12v2H2z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        console.error('Error fetching history:', error);
+        historyList.innerHTML = '<p>Error loading history</p>';
+      }
+    }
+
+    // Initial history load
+    updateHistory();
+
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
       if (filesToUpload.length === 0) return;
@@ -235,6 +459,8 @@
         // Upload all files in parallel
         await Promise.allSettled(filesToUpload.map(file => uploadFile(file)));
         uploadButton.textContent = 'Upload Complete';
+        // Update history after successful upload
+        updateHistory();
       } catch (error) {
         console.error('Upload error:', error);
       } finally {

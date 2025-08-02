@@ -30,6 +30,35 @@ app.get('/', (req, res) => {
 
 app.use('/uploads', express.static(uploadDir));
 
+// List uploaded files
+app.get('/uploads', (req, res) => {
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      return formatResponse(res, 500, { error: 'Error reading uploads directory' });
+    }
+
+    // Get file details
+    const fileDetails = files.map(filename => {
+      const filePath = path.join(uploadDir, filename);
+      try {
+        const stats = fs.statSync(filePath);
+        return {
+          name: filename,
+          size: stats.size,
+          time: stats.mtime
+        };
+      } catch (err) {
+        return null;
+      }
+    }).filter(Boolean); // Remove any null entries
+
+    // Sort by most recent first
+    fileDetails.sort((a, b) => b.time - a.time);
+    
+    formatResponse(res, 200, fileDetails);
+  });
+});
+
 // Sanitize filename to prevent directory traversal and invalid chars
 function sanitizeFilename(filename) {
   // Remove path traversal and normalize
