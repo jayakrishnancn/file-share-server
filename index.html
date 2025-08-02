@@ -68,6 +68,7 @@
       text-align: center;
       line-height: 20px;
       font-size: 12px;
+      transition: 0.3s;
     }
 
     .preview-img {
@@ -101,8 +102,8 @@
       Drag and drop files here or click to select
       <input type="file" id="fileInput" name="files" multiple style="display: none;" />
     </div>
-    <div class="file-list" id="fileList"></div>
     <button type="submit">Upload</button>
+    <div class="file-list" id="fileList"></div>   
   </form>
 
   <script>
@@ -169,46 +170,79 @@
       });
     }
 
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      if (filesToUpload.length === 0) return;
-
-      const formData = new FormData();
-      filesToUpload.forEach(file => {
+    // Upload a single file
+    function uploadFile(file) {
+      return new Promise((resolve, reject) => {
+        const formData = new FormData();
         formData.append('files', file);
-      });
 
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/upload');
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload');
+        xhr.setRequestHeader('Accept', 'application/json');
 
-      xhr.upload.addEventListener('progress', (e) => {
-        if (!e.lengthComputable) return;
-
-        const total = e.total;
-        let loaded = e.loaded;
-
-        let offset = 0;
-        filesToUpload.forEach(file => {
-          const percent = Math.min(
-            100,
-            Math.round((Math.min(loaded, offset + file.size) - offset) / file.size * 100)
-          );
+        xhr.upload.addEventListener('progress', (e) => {
+          if (!e.lengthComputable) return;
+          const percent = Math.round((e.loaded / e.total) * 100);
           file.progressBar.style.width = percent + '%';
           file.progressBar.textContent = percent + '%';
-          offset += file.size;
         });
+
+        xhr.onload = () => {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            if (xhr.status === 200) {
+              file.progressBar.style.backgroundColor = '#28a745';
+              file.progressBar.textContent = '✅ Success';
+              resolve(response);
+            } else {
+              const errorMsg = response.error || 'Upload failed';
+              file.progressBar.style.backgroundColor = '#dc3545';
+              file.progressBar.textContent = `❌ ${errorMsg}`;
+              reject(new Error(errorMsg));
+            }
+          } catch (e) {
+            if (xhr.status === 200) {
+              file.progressBar.style.backgroundColor = '#28a745';
+              file.progressBar.textContent = '✅ Success';
+              resolve({ message: xhr.responseText });
+            } else {
+              file.progressBar.style.backgroundColor = '#dc3545';
+              file.progressBar.textContent = `❌ ${xhr.responseText || 'Upload failed'}`;
+              reject(new Error(xhr.responseText || 'Upload failed'));
+            }
+          }
+        };
+
+        xhr.onerror = () => {
+          file.progressBar.style.backgroundColor = '#dc3545';
+          file.progressBar.textContent = '❌ Network error';
+          reject(new Error('Network error'));
+        };
+
+        xhr.send(formData);
       });
+    }
 
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          filesToUpload.forEach(f => f.progressBar.textContent = '✅');
-        } else {
-          filesToUpload.forEach(f => f.progressBar.textContent = '❌ Failed');
-        }
-      };
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      if (filesToUpload.length === 0) return;
 
-      xhr.send(formData);
+      const uploadButton = this.querySelector('button');
+      uploadButton.disabled = true;
+      uploadButton.textContent = 'Uploading...';
+
+      try {
+        // Upload all files in parallel
+        await Promise.allSettled(filesToUpload.map(file => uploadFile(file)));
+        uploadButton.textContent = 'Upload Complete';
+      } catch (error) {
+        console.error('Upload error:', error);
+      } finally {
+        uploadButton.disabled = false;
+        setTimeout(() => {
+          uploadButton.textContent = 'Upload';
+        }, 2000);
+      }
     });
   </script>
 </body>

@@ -21,9 +21,9 @@ app.get('/', (req, res) => {
   const htmlPath = path.join(__dirname, 'index.html');
   fs.readFile(htmlPath, 'utf8', (err, data) => {
     if (err) {
-      res.status(500).send('Error loading UI');
+      formatResponse(res, 500, { error: 'Error loading UI' });
     } else {
-      res.send(data);
+      res.send(data); // Keep as HTML for browser
     }
   });
 });
@@ -48,12 +48,29 @@ function cleanupFile(filePath) {
   }
 }
 
+// Helper function to format response based on Accept header
+function formatResponse(res, status, data) {
+  const acceptHeader = res.req.headers.accept || 'text/plain';
+  
+  if (acceptHeader.includes('application/json')) {
+    // Return JSON when explicitly requested
+    res.status(status).json(data);
+  } else {
+    // Default to text/plain
+    if (typeof data === 'string') {
+      res.status(status).type('text').send(data);
+    } else {
+      res.status(status).type('text').send(data.message || JSON.stringify(data));
+    }
+  }
+}
+
 // File upload handler with console progress
 app.post('/upload', (req, res) => {
   // Check content-length
   const contentLength = parseInt(req.headers['content-length'], 10);
   if (contentLength && contentLength > MAX_FILE_SIZE) {
-    return res.status(413).json({ error: `File size exceeds limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB` });
+    return formatResponse(res, 413, { error: `File size exceeds limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB` });
   }
 
   const contentType = req.headers['content-type'] || '';
@@ -68,7 +85,7 @@ app.post('/upload', (req, res) => {
         limits: { fileSize: MAX_FILE_SIZE }
       });
     } catch (err) {
-      return res.status(400).json({ error: 'Malformed multipart/form-data request' });
+      return formatResponse(res, 400, { error: 'Malformed multipart/form-data request' });
     }
     bb.on('file', (name, file, info) => {
       const { filename } = info;
@@ -107,7 +124,7 @@ app.post('/upload', (req, res) => {
       if (hasError) {
         return; // Error already handled
       }
-      res.status(200).json({ 
+      formatResponse(res, 200, { 
         message: 'Files uploaded successfully!',
         files: uploadedFiles
       });
@@ -135,7 +152,7 @@ app.post('/upload', (req, res) => {
         writeStream.destroy();
         cleanupFile(savePath);
         if (!res.headersSent) {
-          res.status(413).json({ error: `File size exceeds limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB` });
+          formatResponse(res, 413, { error: `File size exceeds limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB` });
         }
         return;
       }
@@ -146,10 +163,10 @@ app.post('/upload', (req, res) => {
       if (hasError) return; // Error already handled
       if (totalBytes === 0) {
         cleanupFile(savePath);
-        return res.status(400).json({ error: 'Empty file' });
+        return formatResponse(res, 400, { error: 'Empty file' });
       }
       console.log(`\n✅ Uploaded: ${filename} as ${saveName}`);
-      res.status(200).json({ 
+      formatResponse(res, 200, { 
         message: 'File uploaded successfully!',
         file: saveName
       });
@@ -161,7 +178,7 @@ app.post('/upload', (req, res) => {
       writeStream.destroy();
       cleanupFile(savePath);
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Error uploading file' });
+        formatResponse(res, 500, { error: 'Error uploading file' });
       }
     });
 
@@ -170,7 +187,7 @@ app.post('/upload', (req, res) => {
       console.error(`❌ Error saving ${filename}:`, err.message);
       cleanupFile(savePath);
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Error saving file' });
+        formatResponse(res, 500, { error: 'Error saving file' });
       }
     });
   }
