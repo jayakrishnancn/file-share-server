@@ -568,41 +568,56 @@
       document.body.removeChild(link);
     }
 
-    // Update history list
-    async function updateHistory() {
+    // Render history list
+    function renderHistory(files) {
       const historyList = document.getElementById('historyList');
+      historyList.innerHTML = files.map(file => `
+        <div class="history-item">
+          ${getFilePreview(file.name)}
+          <div class="history-item-info">
+            <p class="history-item-name" title="${file.name}">${file.name}</p>
+            <p class="history-item-time">
+              ${formatFileSize(file.size)} • ${new Date(file.time).toLocaleString()}
+            </p>
+          </div>
+          <div class="history-item-actions">
+            <button class="download-btn" onclick="downloadFile('${file.name}')" title="Download file">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
+                <path d="M2 13h12v2H2z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
 
+    // Setup SSE for real-time updates
+    const evtSource = new EventSource('/uploads/events');
+    evtSource.onmessage = (event) => {
+      const files = JSON.parse(event.data);
+      renderHistory(files);
+    };
+    evtSource.onerror = (err) => {
+      console.error('EventSource error:', err);
+      evtSource.close();
+      // Fallback to manual update
+      manualUpdateHistory();
+    };
+
+    // Fallback update method
+    async function manualUpdateHistory() {
       try {
         const response = await fetch('/uploads');
         const files = await response.json();
-
-        historyList.innerHTML = files.map(file => `
-          <div class="history-item">
-            ${getFilePreview(file.name)}
-            <div class="history-item-info">
-              <p class="history-item-name" title="${file.name}">${file.name}</p>
-              <p class="history-item-time">
-                ${formatFileSize(file.size)} • ${new Date(file.time).toLocaleString()}
-              </p>
-            </div>
-            <div class="history-item-actions">
-              <button class="download-btn" onclick="downloadFile('${file.name}')" title="Download file">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
-                  <path d="M2 13h12v2H2z"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        `).join('');
+        renderHistory(files);
       } catch (error) {
         console.error('Error fetching history:', error);
-        historyList.innerHTML = '<p>Error loading history</p>';
+        document.getElementById('historyList').innerHTML = '<p>Error loading history</p>';
       }
     }
 
-    // Initial history load
-    updateHistory();
+    // Initial history load via SSE
 
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
@@ -616,8 +631,6 @@
         // Upload all files in parallel
         await Promise.allSettled(filesToUpload.map(file => uploadFile(file)));
         uploadButton.textContent = 'Upload Complete';
-        // Update history after successful upload
-        updateHistory();
       } catch (error) {
         console.error('Upload error:', error);
       } finally {

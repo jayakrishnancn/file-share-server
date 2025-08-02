@@ -2,9 +2,13 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const busboy = require('busboy');
+const chokidar = require('chokidar');
 
 const app = express();
 const PORT = 6748;
+
+// Store connected SSE clients
+const clients = new Set();
 const MAX_FILE_SIZE = 100 * 1024 * 1024 * 1024; // 100GB limit
 
 const isPkg = typeof process.pkg !== 'undefined';
@@ -30,14 +34,10 @@ app.get('/', (req, res) => {
 
 app.use('/uploads', express.static(uploadDir));
 
-// List uploaded files
-app.get('/uploads', (req, res) => {
-  fs.readdir(uploadDir, (err, files) => {
-    if (err) {
-      return formatResponse(res, 500, { error: 'Error reading uploads directory' });
-    }
-
-    // Get file details
+// Get file list helper function
+function getFileList() {
+  try {
+    const files = fs.readdirSync(uploadDir);
     const fileDetails = files.map(filename => {
       const filePath = path.join(uploadDir, filename);
       try {
@@ -50,12 +50,42 @@ app.get('/uploads', (req, res) => {
       } catch (err) {
         return null;
       }
-    }).filter(Boolean); // Remove any null entries
-
-    // Sort by most recent first
-    fileDetails.sort((a, b) => b.time - a.time);
+    }).filter(Boolean);
     
-    formatResponse(res, 200, fileDetails);
+    // Sort by most recent first
+    return fileDetails.sort((a, b) => b.time - a.time);
+  } catch (err) {
+    console.error('Error reading file list:', err);
+    return [];
+  }
+}
+
+// List uploaded files
+app.get('/uploads', (req, res) => {
+  const fileDetails = getFileList();
+  formatResponse(res, 200, fileDetails);
+});
+
+// SSE endpoint for file updates
+app.get('/uploads/events', (req, res) => {
+  // Set headers for SSE
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+
+  // Send initial file list
+  const data = JSON.stringify(getFileList());
+  res.write(`data: ${data}\n\n`);
+
+  // Add client to the set
+  const client = res;
+  clients.add(client);
+
+  // Remove client on connection close
+  req.on('close', () => {
+    clients.delete(client);
   });
 });
 
@@ -323,6 +353,25 @@ function getUniqueFilename(folder, originalName) {
 
   return filename;
 }
+
+// Setup file watcher
+const watcher = chokidar.watch(uploadDir, {
+  ignored: /(^|[\/\\])\../, // ignore dotfiles
+  persistent: true
+});
+
+// Handle file changes
+function notifyClients() {
+  const data = JSON.stringify(getFileList());
+  clients.forEach(client => {
+    client.write(`data: ${data}\n\n`);
+  });
+}
+
+// Watch for changes
+watcher.on('add', notifyClients)
+  .on('unlink', notifyClients)
+  .on('change', notifyClients);
 
 app.listen(PORT, () => {
   console.log(`🚀 Upload server running at http://localhost:${PORT}`);
