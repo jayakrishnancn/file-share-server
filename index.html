@@ -263,9 +263,12 @@
     }
 
     .preview-img {
-      max-width: 100px;
-      max-height: 100px;
+      width: 100px;
+      height: 100px;
       margin-top: 5px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 2px solid #111;
     }
 
     .file-ext-preview {
@@ -406,8 +409,41 @@
       if (file.type.startsWith('image/')) {
         const preview = document.createElement('img');
         preview.className = 'preview-img';
+        preview.loading = 'lazy';
+        preview.width = 100;
+        preview.height = 100;
         const reader = new FileReader();
-        reader.onload = e => preview.src = e.target.result;
+       //reader.onload = e => preview.src = e.target.result;
+        reader.onload = e => {
+          // Create an off-screen canvas to resize the image
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const img = new Image();
+          
+          img.onload = () => {
+            // Calculate size to maintain aspect ratio within 100x100
+            const scale = Math.min(100 / img.width, 100 / img.height);
+            canvas.width = 100;
+            canvas.height = 100;
+            
+            // Fill background
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Center the image
+            const scaledWidth = img.width * scale;
+            const scaledHeight = img.height * scale;
+            const x = (100 - scaledWidth) / 2;
+            const y = (100 - scaledHeight) / 2;
+            
+            // Draw scaled image
+            ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+            
+            // Convert to WebP if supported
+            preview.src = canvas.toDataURL('image/webp', 0.8) || canvas.toDataURL('image/jpeg', 0.8);
+          };
+          img.src = e.target.result;
+        };
         reader.readAsDataURL(file);
         return preview;
       } else {
@@ -507,7 +543,7 @@
       const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
       if (imageExts.includes(ext)) {
-        return `<img src="/uploads/${filename}" onerror="this.outerHTML='<div class=\\'history-ext-preview\\'>${ext.toUpperCase()}</div>'" alt="">`;
+        return `<img src="/uploads/${filename}" width="42" height="42" loading="lazy" onerror="this.outerHTML='<div class=\\'history-ext-preview\\'>${ext.toUpperCase()}</div>'" alt="">`;
       }
 
       return `<div class="history-ext-preview">${ext.toUpperCase()}</div>`;
